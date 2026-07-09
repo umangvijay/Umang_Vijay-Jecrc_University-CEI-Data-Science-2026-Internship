@@ -1,0 +1,144 @@
+PANDAS & MATPLOTLIB PLOTTING REFERENCE
+=======================================
+
+MATPLOTLIB BASICS
+-----------------
+  import matplotlib.pyplot as plt
+  import matplotlib
+  matplotlib.use('Agg')  # Required for non-interactive (server/subprocess) environments
+
+  fig, ax = plt.subplots(figsize=(12, 6))
+  ax.plot(x, y)
+  ax.set_title('Title')
+  ax.set_xlabel('X Label')
+  ax.set_ylabel('Y Label')
+  plt.tight_layout()
+  fig.savefig('chart.png', dpi=150, bbox_inches='tight')
+  plt.close(fig)
+
+COMMON ERROR: RuntimeError: main thread is not in main loop
+FIX: Always set matplotlib.use('Agg') BEFORE importing pyplot.
+
+CHART TYPES — MATPLOTLIB
+-------------------------
+  # Bar Chart
+  fig, ax = plt.subplots(figsize=(12, 6))
+  ax.bar(categories, values, color='steelblue')
+
+  # Horizontal Bar
+  ax.barh(categories, values)
+
+  # Line Chart
+  ax.plot(x, y, marker='o', linewidth=2)
+
+  # Scatter Plot
+  ax.scatter(x, y, c=colors, s=sizes, alpha=0.6)
+
+  # Pie Chart
+  ax.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=90)
+
+  # Histogram
+  ax.hist(data, bins=30, edgecolor='black', alpha=0.7)
+
+  # Box Plot
+  ax.boxplot(data)
+
+  # Heatmap (use seaborn)
+  import seaborn as sns
+  sns.heatmap(data, annot=True, cmap='coolwarm', ax=ax)
+
+MULTIPLE SUBPLOTS
+-----------------
+  fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+  axes[0, 0].bar(x, y)
+  axes[0, 1].plot(x, y)
+  axes[1, 0].scatter(x, y)
+  axes[1, 1].hist(y)
+  plt.tight_layout()
+
+COMMON ERROR: IndexError when accessing axes
+FIX: With subplots(1, 1), axes is a single Axes, not array.
+Use: fig, ax = plt.subplots() for single plots.
+
+SEABORN CHARTS
+--------------
+  import seaborn as sns
+
+  # Count Plot
+  sns.countplot(data=df, x='category', ax=ax)
+
+  # Box Plot
+  sns.boxplot(data=df, x='category', y='value', ax=ax)
+
+  # Violin Plot
+  sns.violinplot(data=df, x='category', y='value', ax=ax)
+
+  # Heatmap (correlation)
+  sns.heatmap(df.corr(), annot=True, cmap='coolwarm', ax=ax)
+
+  # Pair Plot (returns its own figure)
+  g = sns.pairplot(df[numeric_cols])
+
+  # Missing Values Heatmap
+  sns.heatmap(df.isnull(), cbar=True, yticklabels=False, ax=ax)
+
+PLOTLY INTERACTIVE CHARTS
+--------------------------
+  import plotly.express as px
+  import plotly.graph_objects as go
+
+  # Bar Chart
+  fig = px.bar(df, x='category', y='value', title='Bar Chart',
+               color='category', barmode='group')
+
+  # Line Chart
+  fig = px.line(df, x='date', y='value', title='Trend Line')
+
+  # Scatter Plot
+  fig = px.scatter(df, x='x', y='y', color='group', size='value')
+
+  # Pie Chart
+  fig = px.pie(df, names='category', values='value', title='Distribution')
+
+  # Histogram
+  fig = px.histogram(df, x='value', nbins=30, title='Distribution')
+
+  # Box Plot
+  fig = px.box(df, x='category', y='value')
+
+  # Heatmap
+  fig = px.imshow(correlation_matrix, text_auto=True, color_continuous_scale='RdBu_r')
+
+  # Subplots
+  from plotly.subplots import make_subplots
+  fig = make_subplots(rows=2, cols=2, subplot_titles=('A', 'B', 'C', 'D'))
+  fig.add_trace(go.Bar(x=x, y=y), row=1, col=1)
+
+SAVING PLOTLY CHARTS
+--------------------
+  fig.write_html('chart.html')           # Interactive HTML
+  fig.write_image('chart.png')           # Static image (requires kaleido)
+
+  # If kaleido not installed, fall back to HTML only:
+  try:
+      fig.write_image('chart.png')
+  except Exception:
+      fig.write_html('chart.html')
+
+PLOTLY STYLING
+--------------
+  fig.update_layout(
+      template='plotly_dark',
+      title_font_size=20,
+      xaxis_title='X Axis',
+      yaxis_title='Y Axis',
+      legend_title='Legend',
+      width=1000, height=600,
+  )
+
+COMMON ERRORS:
+  ValueError: Mime type rendering requires nbformat>=4.2.0
+  FIX: Use fig.write_html() instead of fig.show() in subprocess environments.
+
+  ImportError: kaleido not installed
+  FIX: Use fig.write_html() as fallback, or install: pip install kaleido
