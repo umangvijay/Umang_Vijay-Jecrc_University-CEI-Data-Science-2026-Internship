@@ -1,0 +1,58 @@
+NUMPY BASICS — QUICK REFERENCE
+================================
+
+ARRAY CREATION
+--------------
+  import numpy as np
+
+  np.array([1, 2, 3])                    # From list
+  np.zeros((3, 4))                       # 3x4 array of zeros
+  np.ones((3, 4))                        # 3x4 array of ones
+  np.arange(0, 10, 2)                    # [0, 2, 4, 6, 8]
+  np.linspace(0, 1, 5)                   # 5 evenly spaced points from 0 to 1
+  np.random.rand(3, 4)                   # Random uniform [0, 1)
+  np.random.randn(3, 4)                  # Random normal (mean=0, std=1)
+  np.random.randint(0, 10, size=(3, 4))  # Random integers
+
+STATISTICAL FUNCTIONS
+---------------------
+  np.mean(arr)       # Mean
+  np.median(arr)     # Median
+  np.std(arr)        # Standard deviation
+  np.var(arr)        # Variance
+  np.min(arr)        # Minimum
+  np.max(arr)        # Maximum
+  np.sum(arr)        # Sum
+  np.percentile(arr, 25)  # 25th percentile
+  np.corrcoef(x, y)      # Correlation coefficient
+
+ARRAY OPERATIONS
+----------------
+  arr + 1             # Element-wise addition
+  arr * 2             # Element-wise multiplication
+  arr1 + arr2         # Element-wise array addition
+  np.dot(arr1, arr2)  # Dot product
+  arr.reshape(3, 4)   # Reshape
+  arr.flatten()        # Flatten to 1D
+  arr.T               # Transpose
+
+BOOLEAN INDEXING
+----------------
+  arr[arr > 5]                 # Elements greater than 5
+  arr[(arr > 2) & (arr < 8)]  # Multiple conditions
+  np.where(condition, x, y)   # Conditional selection
+
+USEFUL FOR DATA SCIENCE
+-----------------------
+  np.unique(arr)                   # Unique values
+  np.unique(arr, return_counts=True)  # With counts
+  np.isnan(arr).sum()              # Count NaN values
+  np.nan_to_num(arr, nan=0.0)     # Replace NaN
+  np.clip(arr, min_val, max_val)  # Clip values to range
+
+COMMON ERRORS:
+  ValueError: operands could not be broadcast together
+  Fix: Ensure arrays have compatible shapes for operations.
+
+  AxisError: axis N is out of bounds for array of dimension M
+  Fix: Check array dimensions with arr.ndim and arr.shape.

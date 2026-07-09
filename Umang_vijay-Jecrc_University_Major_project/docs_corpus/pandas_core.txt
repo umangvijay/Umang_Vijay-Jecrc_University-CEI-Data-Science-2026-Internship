@@ -1,0 +1,155 @@
+PANDAS CORE DOCUMENTATION — QUICK REFERENCE
+=============================================
+
+DATAFRAME BASICS
+----------------
+A DataFrame is a 2-dimensional labeled data structure with columns of potentially different types.
+
+Creating DataFrames:
+  df = pd.DataFrame(data, columns=['col1', 'col2'])
+  df = pd.read_csv('file.csv')
+  df = pd.read_excel('file.xlsx', engine='openpyxl')
+  df = pd.read_json('file.json')
+
+Inspecting:
+  df.head(n)         # First n rows (default 5)
+  df.tail(n)         # Last n rows
+  df.shape            # (rows, columns)
+  df.info()           # Column types and non-null counts
+  df.describe()       # Statistical summary of numeric columns
+  df.dtypes           # Data types per column
+  df.columns          # Column names
+  df.index            # Row index
+
+SELECTING DATA
+--------------
+  df['column']              # Select single column (returns Series)
+  df[['col1', 'col2']]     # Select multiple columns (returns DataFrame)
+  df.loc[row_label]         # Select by label
+  df.iloc[row_index]        # Select by integer position
+  df.loc[df['col'] > 5]    # Boolean indexing
+
+COMMON ERRORS AND FIXES:
+  KeyError: 'column_name' — Column doesn't exist. Check df.columns for available names.
+  Fix: Use df.columns.tolist() to see all columns, then pick the correct name.
+
+  TypeError: unsupported operand type — Trying math on non-numeric column.
+  Fix: Convert with pd.to_numeric(df['col'], errors='coerce') or check dtype first.
+
+FILTERING AND QUERYING
+----------------------
+  df[df['col'] > value]                    # Filter rows
+  df[(df['A'] > 1) & (df['B'] < 5)]       # Multiple conditions (use & and |, with parentheses)
+  df.query("col > 5 and col2 == 'value'")  # String-based query
+
+GROUPBY OPERATIONS
+------------------
+  df.groupby('col').sum()                    # Group and aggregate
+  df.groupby('col').agg({'A': 'sum', 'B': 'mean'})  # Multiple aggregations
+  df.groupby(['col1', 'col2']).size()        # Count per group
+  df.groupby('col')['value'].transform('mean')  # Transform within groups
+
+COMMON ERRORS:
+  DataError: No numeric types to aggregate
+  Fix: Select only numeric columns before aggregation: df.select_dtypes(include='number')
+
+  KeyError in groupby: Column not found
+  Fix: Check column names with df.columns.tolist()
+
+MERGE AND JOIN
+--------------
+  pd.merge(df1, df2, on='key')              # Inner join
+  pd.merge(df1, df2, on='key', how='left')  # Left join
+  pd.concat([df1, df2], axis=0)             # Vertical concatenation
+  pd.concat([df1, df2], axis=1)             # Horizontal concatenation
+
+MISSING VALUES
+--------------
+  df.isnull().sum()                # Count missing per column
+  df.dropna()                      # Drop rows with any missing
+  df.dropna(subset=['col'])        # Drop rows where specific column is missing
+  df.fillna(0)                     # Fill with value
+  df.fillna(method='ffill')        # Forward fill (deprecated in pandas 2.0+, use df.ffill())
+  df.ffill()                       # Forward fill (pandas 2.0+)
+  df.bfill()                       # Backward fill (pandas 2.0+)
+  df.interpolate()                 # Interpolate missing values
+
+IMPORTANT: In pandas 2.0+, method parameter in fillna is deprecated.
+Use df.ffill() and df.bfill() instead of df.fillna(method='ffill').
+
+SORTING
+-------
+  df.sort_values('col')                    # Sort by column
+  df.sort_values('col', ascending=False)   # Descending sort
+  df.sort_values(['col1', 'col2'])         # Multi-column sort
+
+PIVOT TABLES
+------------
+  df.pivot_table(values='val', index='row', columns='col', aggfunc='sum')
+  pd.crosstab(df['A'], df['B'])    # Cross-tabulation
+
+TYPE CONVERSION
+---------------
+  df['col'] = df['col'].astype(int)
+  df['col'] = pd.to_numeric(df['col'], errors='coerce')
+  df['date'] = pd.to_datetime(df['date'], errors='coerce')
+  df['col'] = df['col'].astype('category')
+
+COMMON ERRORS:
+  ValueError: could not convert string to float
+  Fix: Use pd.to_numeric(df['col'], errors='coerce') to convert non-numeric to NaN.
+
+  OutOfBoundsDatetime: Out of bounds nanosecond timestamp
+  Fix: Use pd.to_datetime(df['col'], errors='coerce') to handle invalid dates.
+
+STRING OPERATIONS
+-----------------
+  df['col'].str.lower()
+  df['col'].str.upper()
+  df['col'].str.contains('pattern')
+  df['col'].str.replace('old', 'new')
+  df['col'].str.split('delimiter')
+  df['col'].str.strip()
+
+DUPLICATES
+----------
+  df.duplicated()                    # Boolean mask of duplicates
+  df.duplicated().sum()              # Count duplicates
+  df.drop_duplicates()               # Remove duplicates
+  df.drop_duplicates(subset=['col']) # Remove duplicates based on specific columns
+
+APPLY AND MAP
+-------------
+  df['col'].apply(func)              # Apply function to each element
+  df.apply(func, axis=1)             # Apply function to each row
+  df['col'].map(dict_or_func)        # Map values
+
+DATETIME OPERATIONS
+-------------------
+  df['date'] = pd.to_datetime(df['date'])
+  df['year'] = df['date'].dt.year
+  df['month'] = df['date'].dt.month
+  df['day_of_week'] = df['date'].dt.dayofweek
+  df['quarter'] = df['date'].dt.quarter
+  df.set_index('date').resample('M').sum()   # Monthly resampling
+  df.set_index('date').resample('W').mean()  # Weekly resampling
+
+COMMON ERRORS:
+  AttributeError: Can only use .dt accessor with datetimelike values
+  Fix: Convert column first: df['col'] = pd.to_datetime(df['col'], errors='coerce')
+
+VALUE COUNTS AND UNIQUE
+-----------------------
+  df['col'].value_counts()           # Frequency counts
+  df['col'].unique()                 # Unique values
+  df['col'].nunique()                # Number of unique values
+
+STATISTICAL OPERATIONS
+----------------------
+  df['col'].mean()
+  df['col'].median()
+  df['col'].std()
+  df['col'].var()
+  df['col'].min(), df['col'].max()
+  df['col'].quantile(0.25)          # 25th percentile
+  df.corr()                         # Correlation matrix
