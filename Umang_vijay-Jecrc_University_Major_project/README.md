@@ -6,7 +6,38 @@
 [![Streamlit](https://img.shields.io/badge/Streamlit-1.35%2B-FF4B4B?logo=streamlit&logoColor=white)](https://streamlit.io)
 [![LangChain](https://img.shields.io/badge/LangChain-0.3%2B-green?logo=chainlink&logoColor=white)](https://langchain.com)
 [![Google Gemini](https://img.shields.io/badge/Gemini-2.0--Flash-4285F4?logo=google&logoColor=white)](https://aistudio.google.com)
+[![GPT4All](https://img.shields.io/badge/GPT4All-Phi--4--mini-purple?logo=meta&logoColor=white)](https://gpt4all.io)
+[![Ollama](https://img.shields.io/badge/Ollama-Local%20LLM-black?logo=ollama&logoColor=white)](https://ollama.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+---
+
+## 🚀 How to Run the App
+
+**⚠️ Important:** Do NOT use the standard "Run Python File" (Play button) in VS Code. Streamlit apps must be executed using the `streamlit run` command.
+
+### Option 1: Use the Terminal (Recommended)
+```powershell
+# From the project directory:
+python -m streamlit run app.py
+
+# From the parent directory:
+python -m streamlit run .\Umang_vijay-Jecrc_University_Major_project\app.py
+
+# If port 8501 is busy, use port 8505:
+python -m streamlit run app.py --server.port 8505
+```
+
+### Option 2: Use the provided `run.bat` file
+You can start the app using the batch script which also handles the virtual environment:
+```powershell
+.\run.bat
+```
+
+### Option 3: Press F5 (Run and Debug)
+A `.vscode/launch.json` file has been configured for this project. 
+1. Make sure `app.py` is the active file in your editor.
+2. Press **F5** on your keyboard (or click the green play button in the **Run and Debug** tab).
 
 ---
 
@@ -18,7 +49,7 @@
 | **University** | JECRC University |
 | **Project Type** | Major Project — Agentic AI / Data Engineering / Full-Stack Python |
 | **Internship** | Celebal CEI Data Science Internship |
-| **Tech Stack** | Python, Streamlit, LangChain, Google Gemini, FAISS, Pandas, Plotly |
+| **Tech Stack** | Python, Streamlit, LangChain, Gemini / Ollama, FAISS, Pandas, Plotly |
 
 ---
 
@@ -146,6 +177,56 @@ graph TB
 
 ---
 
+## 🔌 LLM Backend — 3-Tier Fallback System
+
+The application uses a **3-tier fallback system** so it works in any environment — from full API access to zero setup:
+
+| Priority | Backend | Needs | Quality |
+|---|---|---|---|
+| 1 | **Google Gemini** | API key in sidebar | ⭐ Best |
+| 2 | **Ollama (Local)** | Ollama installed + `ollama pull llama3.2` | ⭐ Good |
+| 3 | **Demo Mode** | Nothing — pre-computed | ⭐ Basic (for evaluation) |
+
+### How It Works
+
+```
+User starts the app
+     │
+     ├─ API key provided? ──── YES ──► Tier 1: Google Gemini
+     │
+     ├─ Ollama running? ────── YES ──► Tier 2: Ollama (Local LLM)
+     │
+     └─ Neither available? ────────► Tier 3: Demo Mode (pre-computed)
+```
+
+### Tier 1: Google Gemini (Best Quality)
+- Enter your API key in the sidebar
+- Get a free key: [Google AI Studio](https://aistudio.google.com/) → Get API Key
+- Model: `gemini-2.0-flash` via LangChain
+
+### Tier 2: Ollama — Local LLM (No API Key Needed)
+```bash
+# 1. Install Ollama (https://ollama.com)
+# 2. Pull a model:
+ollama pull llama3.2
+# 3. Start the server:
+ollama serve
+# 4. Select "🦙 Ollama (Local)" in the sidebar
+```
+- Runs entirely on your machine
+- Supported models: llama3.2, codellama, mistral, deepseek-coder
+- No API key, no internet required for inference
+
+### Tier 3: Demo Mode (Zero Setup)
+- Works immediately without any API keys or Ollama
+- Uses pre-computed analysis templates for all 5 use cases
+- Generates real charts and insights using Pandas + Matplotlib
+- **Perfect for mentor evaluation of a public repository**
+
+> 💡 **For evaluators**: Just clone the repo, install dependencies, and run — Demo Mode activates automatically.
+
+---
+
 ## 🚀 Features & Use Cases
 
 ### Core Use Cases
@@ -163,9 +244,10 @@ graph TB
 | Feature | Description | Tech |
 |---|---|---|
 | 🔮 **Predictive Forecasting** | Linear regression + ARIMA time-series forecasting | scikit-learn + statsmodels |
-| 📋 **Auto Schema Summary** | Instant dataset analysis on upload | Gemini + Pandas profiling |
+| 📋 **Auto Schema Summary** | Instant dataset analysis on upload | LLM + Pandas profiling |
 | 🔄 **Self-Correction Loop** | RAG-powered error recovery (up to 3 retries) | FAISS + LangChain |
 | 🔒 **Sandbox Execution** | Secure code execution with timeout & import restrictions | Python subprocess |
+| 📥 **Multi-Format Downloads** | Export code (.py, .ipynb) and reports (.md, .json, .csv) | Built-in |
 
 ---
 
@@ -186,7 +268,8 @@ Umang_vijay-Jecrc_University_Major_project/
 │
 ├── 📁 core/                         # Core agent engine
 │   ├── __init__.py
-│   ├── agent.py                     # Agentic orchestrator (LangChain + Gemini)
+│   ├── agent.py                     # Agentic orchestrator (LangChain)
+│   ├── llm_backend.py               # 🆕 Multi-backend LLM factory (Gemini/Ollama/Demo)
 │   ├── sandbox.py                   # Secure subprocess executor
 │   ├── rag_pipeline.py              # FAISS RAG self-correction engine
 │   ├── schema_analyzer.py           # Auto schema summary generator
@@ -220,9 +303,10 @@ Umang_vijay-Jecrc_University_Major_project/
 | Layer | Technology | Purpose |
 |---|---|---|
 | **Frontend** | Streamlit 1.35+ | Interactive web UI with dark theme |
-| **LLM / Agent** | Google Gemini 2.0 Flash | Code generation & natural language understanding |
+| **LLM / Agent** | Google Gemini 2.0 Flash / Ollama (local) | Code generation & NLU (3-tier fallback) |
 | **Agent Framework** | LangChain 0.3+ | Prompt management, chains, structured output |
-| **Embeddings** | Google Generative AI Embeddings | Document vectorization for RAG |
+| **Local LLM** | LangChain-Ollama 0.3+ | Free local inference via Ollama |
+| **Embeddings** | Gemini / Ollama Embeddings | Document vectorization for RAG |
 | **Vector Store** | FAISS | Fast similarity search for error correction |
 | **Data Processing** | Pandas, NumPy, OpenPyXL | DataFrame operations, Excel support |
 | **Visualization** | Plotly, Matplotlib, Seaborn | Interactive & static professional charts |
@@ -237,8 +321,8 @@ Umang_vijay-Jecrc_University_Major_project/
 ### Prerequisites
 
 - **Python 3.10+** installed
-- **Google Gemini API Key** from [Google AI Studio](https://aistudio.google.com/)
 - **Git** for version control
+- **Optional**: Google Gemini API Key or Ollama (the app works without both in Demo Mode)
 
 ### 1. Clone the Repository
 
@@ -266,27 +350,69 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 4. Configure API Key
+### 4. Choose Your LLM Backend
 
-Create a `.env` file in the project root (or edit the existing template):
-
-```env
-GOOGLE_API_KEY=your_actual_gemini_api_key_here
+**Option A: Demo Mode (zero setup — for quick evaluation)**
+```bash
+# Just run the app! Demo Mode activates automatically.
+streamlit run app.py
 ```
 
-> 💡 **How to get a free API key:**
+**Option B: Ollama — Local LLM (free, no API key)**
+```bash
+# Install Ollama from https://ollama.com
+ollama pull llama3.2
+ollama serve
+# Then run the app and select "🦙 Ollama (Local)" in the sidebar
+streamlit run app.py
+```
+
+**Option C: Google Gemini (best quality)**
+```bash
+# Create .env file with your API key
+echo GOOGLE_API_KEY=your_actual_gemini_api_key_here > .env
+streamlit run app.py
+```
+
+> 💡 **How to get a free Gemini API key:**
 > 1. Go to [Google AI Studio](https://aistudio.google.com/)
 > 2. Sign in with your Google account
 > 3. Click **"Get API Key"** → **"Create API Key"**
-> 4. Copy the key and paste it in `.env`
+> 4. Copy the key into `.env` or paste in the sidebar
 
-### 5. Run the Application
+### 5. Open the Application
 
 ```bash
 streamlit run app.py
 ```
 
 The app will open at `http://localhost:8501` 🚀
+
+---
+
+## 👨‍🏫 For Mentors / Evaluators
+
+This project is designed to work **without any API keys** for easy evaluation:
+
+```bash
+# 1. Clone and install
+git clone <repo-url>
+cd Umang_vijay-Jecrc_University_Major_project
+python -m venv venv
+.\venv\Scripts\activate   # or: source venv/bin/activate
+pip install -r requirements.txt
+
+# 2. Run (Demo Mode activates automatically)
+streamlit run app.py
+
+# 3. In the browser:
+#    - Click a sample dataset (Sales, Customer, or Time)
+#    - Go to "AI Analysis" tab
+#    - Type a question and click "Run Analysis"
+#    - Charts and insights generate using pre-computed templates
+```
+
+For full AI-powered analysis, install [Ollama](https://ollama.com) and run `ollama pull llama3.2`.
 
 ---
 
@@ -421,6 +547,7 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 - **Celebal Technologies** — CEI Data Science Internship program
 - **JECRC University** — Academic guidance and support
 - **Google** — Gemini API for generative AI capabilities
+- **Ollama** — Free local LLM inference
 - **LangChain** — Agent framework and RAG pipeline tools
 - **Meta AI** — FAISS vector similarity search library
 

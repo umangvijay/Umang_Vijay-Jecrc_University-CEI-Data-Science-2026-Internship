@@ -16,13 +16,117 @@ css_path = Path(__file__).parent / "static" / "style.css"
 if css_path.exists():
     st.markdown(f"<style>{css_path.read_text()}</style>", unsafe_allow_html=True)
 
+import streamlit.components.v1 as components
+
+# ── WebGL Shader Background ──
+components.html("""
+<script>
+(function() {
+    const parentDoc = window.parent.document;
+    if (parentDoc.getElementById('fluid-shader-bg')) return;
+    
+    const canvas = parentDoc.createElement('canvas');
+    canvas.id = 'fluid-shader-bg';
+    canvas.style.position = 'fixed';
+    canvas.style.top = '0';
+    canvas.style.left = '0';
+    canvas.style.width = '100vw';
+    canvas.style.height = '100vh';
+    canvas.style.zIndex = '-1';
+    canvas.style.pointerEvents = 'none';
+    canvas.style.opacity = '0.6';
+    parentDoc.body.insertBefore(canvas, parentDoc.body.firstChild);
+    
+    if (!parentDoc.getElementById('fluid-deco-1')) {
+        const deco1 = parentDoc.createElement('div');
+        deco1.id = 'fluid-deco-1';
+        deco1.style.position = 'fixed';
+        deco1.style.right = '-50px';
+        deco1.style.top = '10%';
+        deco1.style.opacity = '0.4';
+        deco1.style.pointerEvents = 'none';
+        deco1.style.zIndex = '-5';
+        deco1.style.mixBlendMode = 'screen';
+        deco1.style.animation = 'float 6s ease-in-out infinite';
+        
+        const img1 = parentDoc.createElement('img');
+        img1.src = 'https://lh3.googleusercontent.com/aida/AP1WRLvRWdUcBCQMv_yL7Emv-IEjvAbaQh_xU1LVMt3EwPOXoJ-PWYCN6YlPb4L7ICrEgWFLdqq6ugFLgicdmPupQcEDUNKxL6x6ze8GFTm2zvdmBgwLRuXdbYnwuP4-PjvT7ta4rz7w6PCB7eawdyG5VADvTfkB886uVzMU6N5iPEgC3YMgElrdlGPzNezJUBaUu06wxKBDEVkK-RxXmF5VawoiDvV4otDKSv3Ua8jF2VhiTz9Of6QDx8YEG2y4';
+        img1.style.width = '500px';
+        img1.style.height = 'auto';
+        img1.style.borderRadius = '50%';
+        img1.style.filter = 'blur(2px)';
+        deco1.appendChild(img1);
+        parentDoc.body.appendChild(deco1);
+    }
+
+    if (!parentDoc.getElementById('fluid-deco-2')) {
+        const deco2 = parentDoc.createElement('div');
+        deco2.id = 'fluid-deco-2';
+        deco2.style.position = 'fixed';
+        deco2.style.left = '-50px';
+        deco2.style.bottom = '10%';
+        deco2.style.opacity = '0.3';
+        deco2.style.pointerEvents = 'none';
+        deco2.style.zIndex = '-5';
+        deco2.style.mixBlendMode = 'screen';
+        deco2.style.animation = 'float 6s ease-in-out infinite';
+        deco2.style.animationDelay = '2s';
+        
+        const img2 = parentDoc.createElement('img');
+        img2.src = 'https://lh3.googleusercontent.com/aida/AP1WRLsmWch2msYedCsDvxc0q05lZDphpzztwfS-tHqdNJs6xZMaSUN61E5qtbc4QRzGGZF4rPRKCSo37Q3M3_6cUpmEuWUuDVZ-gS7LlE9lrZUSXsllfg7ajSpQg9nV5iTaNcw37nYzjhrooihA5IZNEYDkahl51kCbtHZGlT5G0OdI2JUpO6zzAIrOfyualhru0xhBnuCNqXZer24-BCOAD8WHA6nRmCcjuXOK8WTAREroEkVLZUQmaTebj36i';
+        img2.style.width = '400px';
+        img2.style.height = 'auto';
+        img2.style.filter = 'blur(1px)';
+        deco2.appendChild(img2);
+        parentDoc.body.appendChild(deco2);
+    }
+    
+    function syncSize() {
+        const w = parentDoc.documentElement.clientWidth;
+        const h = parentDoc.documentElement.clientHeight;
+        if (canvas.width !== w || canvas.height !== h) {
+            canvas.width = w;
+            canvas.height = h;
+        }
+    }
+    window.parent.addEventListener('resize', syncSize);
+    syncSize();
+    
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    if (!gl) return;
+    const vs = `attribute vec2 a_position; varying vec2 v_texCoord; void main() { v_texCoord = a_position * 0.5 + 0.5; gl_Position = vec4(a_position, 0.0, 1.0); }`;
+    const fs = `precision highp float; uniform float u_time; uniform vec2 u_resolution; void main() { vec2 uv = gl_FragCoord.xy / u_resolution.xy; float color = 0.0; vec2 p = uv * 2.0 - 1.0; p.x *= u_resolution.x / u_resolution.y; float t = u_time * 0.2; for(float i = 1.0; i < 4.0; i++){ p.x += 0.3 / i * sin(i * 3.0 * p.y + t + i * 0.5); p.y += 0.3 / i * cos(i * 3.0 * p.x + t + i * 0.5); } vec3 baseColor = vec3(0.02, 0.01, 0.02); vec3 accentColor = vec3(0.1, 0.02, 0.08) * abs(sin(u_time * 0.1)); vec3 finalColor = mix(baseColor, accentColor, 0.5 / length(p)); gl_FragColor = vec4(finalColor * 0.3, 1.0); }`;
+    function cs(type, src) { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); return s; }
+    const prog = gl.createProgram();
+    gl.attachShader(prog, cs(gl.VERTEX_SHADER, vs));
+    gl.attachShader(prog, cs(gl.FRAGMENT_SHADER, fs));
+    gl.linkProgram(prog); gl.useProgram(prog);
+    const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, 1,1]), gl.STATIC_DRAW);
+    const pos = gl.getAttribLocation(prog, 'a_position'); gl.enableVertexAttribArray(pos);
+    gl.vertexAttribPointer(pos, 2, gl.FLOAT, false, 0, 0);
+    const uTime = gl.getUniformLocation(prog, 'u_time');
+    const uRes = gl.getUniformLocation(prog, 'u_resolution');
+    
+    function render(t) {
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        if (uTime) gl.uniform1f(uTime, t * 0.001);
+        if (uRes) gl.uniform2f(uRes, canvas.width, canvas.height);
+        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        window.parent.requestAnimationFrame(render);
+    }
+    window.parent.requestAnimationFrame(render);
+})();
+</script>
+""", height=0, width=0)
+
 # ── Session State ──
 def init_state():
     defaults = {"df": None, "schema_report": None, "agent": None,
                 "api_key": os.getenv("GOOGLE_API_KEY", ""), "file_name": "",
                 "analysis_result": None, "rag_initialized": False,
                 "query_history": [], "session_start": time.strftime("%H:%M:%S"),
-                "agent_status": "Idle"}
+                "agent_status": "Idle", "llm_backend": "auto"}
     for k, v in defaults.items():
         if k not in st.session_state:
             st.session_state[k] = v
@@ -32,16 +136,94 @@ init_state()
 with st.sidebar:
     # Brand
     st.markdown("""<div class="fluid-brand">
-        <div class="ping"><span style="color:#00F0FF;font-size:1.2rem;">◉</span></div>
+        <div class="ping"><span style="color:#fff;font-size:1rem;">◉</span></div>
         <span>Fluid Analyst</span>
     </div>""", unsafe_allow_html=True)
 
-    # API Key
+    # Home / New Session button (visible when data is loaded)
+    if st.session_state.df is not None:
+        if st.button("🏠 New Session", key="home_btn", use_container_width=True):
+            st.session_state.df = None
+            st.session_state.schema_report = None
+            st.session_state.analysis_result = None
+            st.session_state.file_name = ""
+            st.session_state.agent = None
+            st.session_state.rag_initialized = False
+            st.session_state._agent_init_failed = False
+            st.session_state.query_history = []
+            st.rerun()
+
+    # LLM Backend + API Key
     st.markdown('<div class="sidebar-label">Configuration</div>', unsafe_allow_html=True)
-    api_key_input = st.text_input("🔑 API Key", value=st.session_state.api_key,
-                                   type="password", help="Google Gemini API Key", key="api_key_w")
-    if api_key_input:
-        st.session_state.api_key = api_key_input
+
+    backend_options = {"🔄 Auto-Detect": "auto", "✨ Google Gemini": "gemini",
+                       "🦙 Ollama (Local)": "ollama", "🧠 GPT4All (Local)": "gpt4all",
+                       "🎯 Demo Mode": "demo"}
+    sel_backend = st.selectbox("LLM Backend", list(backend_options.keys()), index=0, key="backend_sel")
+    st.session_state.llm_backend = backend_options[sel_backend]
+
+    # Show API key input only when relevant
+    if st.session_state.llm_backend in ("auto", "gemini"):
+        api_key_input = st.text_input("🔑 API Key", value=st.session_state.api_key,
+                                       type="password", help="Google Gemini API Key", key="api_key_w")
+        if api_key_input:
+            if api_key_input != st.session_state.api_key:
+                st.session_state.agent = None
+                st.session_state._agent_init_failed = False
+                st.session_state.rag_initialized = False
+            st.session_state.api_key = api_key_input
+
+    # Backend status indicator
+    from core.llm_backend import get_backend_status
+    @st.cache_data(ttl=30, show_spinner=False)
+    def _cached_backend_status(key):
+        return get_backend_status(key)
+    _bstatus = _cached_backend_status(st.session_state.api_key)
+    if st.session_state.llm_backend == "demo":
+        st.markdown('<span class="badge badge-ok">🎯 Demo Mode Active</span>', unsafe_allow_html=True)
+        st.caption("Pre-computed templates • No setup needed")
+    elif st.session_state.llm_backend == "gpt4all":
+        if _bstatus["gpt4all"]["available"]:
+            models = _bstatus["gpt4all"].get("models", [])
+            if not models:
+                st.markdown('<span class="badge badge-work">🧠 GPT4All — Needs Download</span>', unsafe_allow_html=True)
+                st.caption("Phi-4-mini (~2.5GB) downloads on first use. Check terminal for progress.")
+            else:
+                st.markdown(f'<span class="badge badge-ok">🧠 GPT4All — {models[0][:20]}</span>', unsafe_allow_html=True)
+                st.caption("Open-source LLM running locally on CPU")
+        else:
+            st.markdown('<span class="badge badge-ok">🎯 Demo Mode (fallback)</span>', unsafe_allow_html=True)
+            st.caption("Install GPT4All: `pip install gpt4all`")
+    elif st.session_state.llm_backend == "ollama":
+        if _bstatus["ollama"]["available"]:
+            st.markdown('<span class="badge badge-ok">🦙 Ollama Connected</span>', unsafe_allow_html=True)
+        elif _bstatus["gpt4all"]["available"]:
+            st.markdown('<span class="badge badge-ok">🧠 GPT4All (fallback)</span>', unsafe_allow_html=True)
+            st.caption("Ollama not found → using GPT4All local LLM")
+        else:
+            st.markdown('<span class="badge badge-ok">🎯 Demo Mode (fallback)</span>', unsafe_allow_html=True)
+            st.caption("No local LLM → using pre-computed analysis")
+    elif st.session_state.llm_backend == "gemini":
+        if _bstatus["gemini"]["available"]:
+            st.markdown('<span class="badge badge-ok">✨ Gemini Ready</span>', unsafe_allow_html=True)
+        elif _bstatus["gpt4all"]["available"]:
+            st.markdown('<span class="badge badge-ok">🧠 GPT4All (fallback)</span>', unsafe_allow_html=True)
+        else:
+            st.markdown('<span class="badge badge-ok">🎯 Demo Mode (fallback)</span>', unsafe_allow_html=True)
+    elif st.session_state.llm_backend == "auto":
+        if _bstatus["gemini"]["available"]:
+            st.markdown('<span class="badge badge-ok">✨ Gemini (auto)</span>', unsafe_allow_html=True)
+        elif _bstatus["ollama"]["available"]:
+            st.markdown('<span class="badge badge-ok">🦙 Ollama (auto)</span>', unsafe_allow_html=True)
+        elif _bstatus["gpt4all"]["available"]:
+            st.markdown('<span class="badge badge-ok">🧠 GPT4All (auto)</span>', unsafe_allow_html=True)
+            models = _bstatus["gpt4all"].get("models", [])
+            if not models:
+                st.caption("Phi-4-mini downloads on first use. Check terminal.")
+            else:
+                st.caption(f"{models[0][:24]} running locally on CPU")
+        else:
+            st.markdown('<span class="badge badge-ok">🎯 Demo Mode (auto)</span>', unsafe_allow_html=True)
 
     # Data Upload
     st.markdown('<div class="sidebar-label">Data Upload</div>', unsafe_allow_html=True)
@@ -52,13 +234,13 @@ with st.sidebar:
     st.markdown('<div class="sidebar-label">Sample Data</div>', unsafe_allow_html=True)
     c1, c2, c3 = st.columns(3)
     with c1:
-        if st.button("📊 Sales", key="btn_s", use_container_width=True):
+        if st.button("📊 Sales", key="btn_s", width="stretch"):
             st.session_state._load_sample = "sales_data.csv"
     with c2:
-        if st.button("👥 Cust.", key="btn_c", use_container_width=True):
+        if st.button("👥 Cust.", key="btn_c", width="stretch"):
             st.session_state._load_sample = "customer_data.csv"
     with c3:
-        if st.button("📈 Time", key="btn_t", use_container_width=True):
+        if st.button("📈 Time", key="btn_t", width="stretch"):
             st.session_state._load_sample = "timeseries_data.csv"
 
     # Detected Columns (dynamic from loaded data)
@@ -81,7 +263,15 @@ with st.sidebar:
     # RAG Status
     st.markdown('<div class="sidebar-label">RAG Pipeline</div>', unsafe_allow_html=True)
     if st.session_state.rag_initialized:
-        st.markdown('<span class="badge badge-ok">● Index Ready</span>', unsafe_allow_html=True)
+        _rag_backend = ""
+        if st.session_state.agent:
+            _rag_backend = getattr(st.session_state.agent.rag, '_backend', '')
+        if _rag_backend == "faiss":
+            st.markdown('<span class="badge badge-ok">● FAISS Index Ready</span>', unsafe_allow_html=True)
+        elif _rag_backend == "tfidf":
+            st.markdown('<span class="badge badge-ok">● TF-IDF Index Ready</span>', unsafe_allow_html=True)
+        else:
+            st.markdown('<span class="badge badge-ok">● Index Ready</span>', unsafe_allow_html=True)
     else:
         st.markdown('<span class="badge badge-work">○ Not Initialized</span>', unsafe_allow_html=True)
 
@@ -130,38 +320,74 @@ load_data()
 # ── Init Agent ──
 def get_agent():
     from core.agent import DataScienceCoPilot
-    if st.session_state.agent is None and st.session_state.api_key:
+    if st.session_state.agent is None:
+        if st.session_state.get("_agent_init_failed"):
+            return None  # Don't retry if init already failed this session
         try:
             st.session_state.agent = DataScienceCoPilot(
                 api_key=st.session_state.api_key,
                 max_retries=st.session_state.get("max_retries_s", 3),
-                temperature=st.session_state.get("temp_s", 0.2))
+                temperature=st.session_state.get("temp_s", 0.2),
+                backend=st.session_state.get("llm_backend", "auto"))
         except Exception as e:
-            st.error(f"Agent init failed: {e}")
+            err_msg = str(e).lower()
+            if "api_key_invalid" in err_msg or "api key not valid" in err_msg:
+                st.error("🔑 Invalid API key. Please check your Google Gemini API key in the sidebar.")
+            elif "quota" in err_msg:
+                st.error("⚠️ API quota exceeded. Please wait or use a different API key.")
+            else:
+                st.error(f"⚠️ Agent initialization failed: {e}")
+            st.session_state._agent_init_failed = True
             return None
     if st.session_state.agent and not st.session_state.rag_initialized:
         try:
             st.session_state.rag_initialized = st.session_state.agent.initialize_rag()
-        except:
+        except Exception:
             st.session_state.rag_initialized = False
     return st.session_state.agent
 
-# ── API Key Gate ──
-if not st.session_state.api_key:
-    st.warning("⚠️ Enter your Google Gemini API key in the sidebar.")
-    st.info("**Get a free key:** [Google AI Studio](https://aistudio.google.com/) → Get API Key")
-    st.stop()
+# Eagerly initialize agent so RAG is ready before the user clicks "Run Analysis"
+get_agent()
+
+# ── LLM Availability Check ──
+# With the 4-tier fallback (Gemini → Ollama → GPT4All → Demo), an LLM is always available.
+from core.llm_backend import check_ollama_available, check_gpt4all_available
+
+@st.cache_data(ttl=30, show_spinner=False)
+def _cached_llm_availability(api_key_val):
+    """Cache expensive LLM availability checks to avoid blocking every rerender."""
+    _key = api_key_val.strip()
+    _placeholders = {"", "your_gemini_api_key_here", "your_api_key_here", "your_key_here", "PASTE_YOUR_KEY"}
+    _has_valid = bool(_key) and _key.lower() not in {p.lower() for p in _placeholders}
+    _ollama = check_ollama_available()
+    _gpt4all = check_gpt4all_available()
+    _active = ("gemini" if _has_valid else
+               ("ollama" if _ollama else
+                ("gpt4all" if _gpt4all else "demo")))
+    return _has_valid, _ollama, _gpt4all, _active
+
+_has_valid_key, _ollama_ok, _gpt4all_ok, active_backend = _cached_llm_availability(st.session_state.api_key)
+has_api_key = True  # Always True — Demo Mode is the final fallback
 
 # ── MAIN CONTENT ──
 if st.session_state.df is not None:
     df = st.session_state.df
 
-    # Auto Schema Analysis (real-time via AI)
+    # Auto Schema Analysis — works with or without API key
     if st.session_state.schema_report is None:
         with st.spinner("🔍 Analyzing dataset schema..."):
-            agent = get_agent()
-            if agent:
-                st.session_state.schema_report = agent.analyze_schema(df)
+            if has_api_key:
+                agent = get_agent()
+                if agent:
+                    try:
+                        st.session_state.schema_report = agent.analyze_schema(df)
+                    except Exception:
+                        st.session_state.schema_report = None
+            # Pandas-only fallback when no API key or agent failed
+            if st.session_state.schema_report is None:
+                from core.schema_analyzer import SchemaAnalyzer
+                analyzer = SchemaAnalyzer(api_key=None)
+                st.session_state.schema_report = analyzer.analyze(df)
 
     # Editorial AI Summary (dynamic from schema analysis)
     if st.session_state.schema_report:
@@ -201,19 +427,19 @@ if st.session_state.df is not None:
                     mi = report["missing_values"].get(cn, {"count": 0, "percentage": 0})
                     col_data.append({"Column": cn, "Type": dt, "Missing": f"{mi['count']} ({mi['percentage']}%)"})
                 if col_data:
-                    st.dataframe(pd.DataFrame(col_data), use_container_width=True, hide_index=True)
+                    st.dataframe(pd.DataFrame(col_data), width="stretch", hide_index=True)
             with cr:
                 st.subheader("💡 Suggested Analyses")
                 for s in report.get("suggested_use_cases", []):
                     st.markdown(f"• {s}")
                 if report.get("numeric_stats"):
                     st.subheader("📈 Numeric Summary")
-                    st.dataframe(pd.DataFrame(report["numeric_stats"]).round(2), use_container_width=True)
+                    st.dataframe(pd.DataFrame(report["numeric_stats"]).round(2), width="stretch")
 
     # ── Preview Tab ──
     with tab_preview:
         st.subheader(f"📊 {st.session_state.file_name}")
-        st.dataframe(df.head(100), use_container_width=True, height=400)
+        st.dataframe(df.head(100), width="stretch", height=400)
         with st.expander("📊 Column Statistics"):
             st.write(df.describe().round(2))
 
@@ -247,7 +473,14 @@ if st.session_state.df is not None:
         if not query:
             st.caption(f"💡 Suggestion: *{suggestions.get(sel_uc, '')}*")
 
-        analyze_btn = st.button("🚀 Run Analysis", type="primary", use_container_width=True, disabled=not query, key="run_btn")
+        # Show which backend will be used
+        if active_backend == "demo":
+            st.info("🎯 **Demo Mode** — Using pre-computed analysis templates. For AI-powered analysis, add a Gemini API key or start Ollama.")
+        elif active_backend == "ollama":
+            st.info("🦙 **Ollama** — Using local LLM for analysis.")
+
+        analyze_btn = st.button("🚀 Run Analysis", type="primary", width="stretch",
+                                disabled=not query, key="run_btn")
 
         if analyze_btn and query:
             agent = get_agent()
@@ -319,7 +552,7 @@ if st.session_state.df is not None:
                         round(tu.total_sandbox_time / max(tu.total_wall_time, 0.01) * 100, 1),
                         round(tu.total_rag_time / max(tu.total_wall_time, 0.01) * 100, 1), 100.0],
                 }
-                st.dataframe(pd.DataFrame(perf_data), use_container_width=True, hide_index=True)
+                st.dataframe(pd.DataFrame(perf_data), width="stretch", hide_index=True)
 
             st.markdown("---")
 
@@ -331,7 +564,7 @@ if st.session_state.df is not None:
                     st.subheader("📊 Generated Charts")
                     for cp in result.chart_paths:
                         if cp.endswith(".png"):
-                            st.image(cp, use_container_width=True)
+                            st.image(cp, width="stretch")
                         elif cp.endswith(".html"):
                             try:
                                 with open(cp, "r", encoding="utf-8") as f:
@@ -352,24 +585,85 @@ if st.session_state.df is not None:
 
                 # Downloads
                 st.subheader("📥 Download Results")
-                dl1, dl2, dl3 = st.columns(3)
-                with dl1:
-                    st.download_button("⬇️ Code", result.code, file_name="generated_code.py",
-                                       mime="text/x-python", use_container_width=True)
-                with dl2:
-                    report_md = f"# Analysis Report\n\n**Query:** {result.query}\n**Use Case:** {result.use_case}\n**Time:** {result.timestamp}\n\n## Insights\n"
-                    for k, v in result.insights.items():
-                        report_md += f"- **{k}:** {v}\n"
-                    report_md += f"\n## Token Usage\n{json.dumps(tu.to_dict(), indent=2)}\n\n## Generated Code\n```python\n{result.code}\n```"
-                    st.download_button("⬇️ Report", report_md, file_name="analysis_report.md",
-                                       mime="text/markdown", use_container_width=True)
-                with dl3:
+
+                # Code download with format selector
+                st.markdown("**📝 Code Download**")
+                code_fmt_col, code_dl_col = st.columns([1, 2])
+                with code_fmt_col:
+                    code_fmt = st.selectbox("Code Format", ["Python (.py)", "Jupyter Notebook (.ipynb)"], key="code_fmt_sel")
+                with code_dl_col:
+                    if code_fmt == "Python (.py)":
+                        st.download_button("⬇️ Download Code", result.code,
+                                           file_name="analysis_code.py", mime="text/x-python", width="stretch")
+                    elif code_fmt == "Jupyter Notebook (.ipynb)":
+                        # Build proper .ipynb JSON structure
+                        nb_cells = [
+                            {"cell_type": "markdown", "metadata": {}, "source": [
+                                f"# Analysis Report\n", f"**Query:** {result.query}\n",
+                                f"**Use Case:** {result.use_case}\n",
+                                f"**Generated:** {result.timestamp}\n"]},
+                            {"cell_type": "code", "metadata": {}, "source": result.code.split("\n"),
+                             "execution_count": None, "outputs": []},
+                        ]
+                        notebook = {"nbformat": 4, "nbformat_minor": 5,
+                                    "metadata": {"kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
+                                                 "language_info": {"name": "python", "version": "3.10.0"}},
+                                    "cells": nb_cells}
+                        st.download_button("⬇️ Download Notebook", json.dumps(notebook, indent=2),
+                                           file_name="analysis.ipynb", mime="application/json", width="stretch")
+
+                # Report download with format selector
+                st.markdown("**📋 Report Download**")
+                rpt_fmt_col, rpt_dl_col = st.columns([1, 2])
+                with rpt_fmt_col:
+                    rpt_fmt = st.selectbox("Report Format", ["Markdown (.md)", "JSON (.json)", "CSV (.csv)"], key="rpt_fmt_sel")
+                with rpt_dl_col:
+                    if rpt_fmt == "Markdown (.md)":
+                        report_md = f"# Analysis Report\n\n**Query:** {result.query}\n**Use Case:** {result.use_case}\n**Time:** {result.timestamp}\n\n## Insights\n"
+                        for k, v in result.insights.items():
+                            report_md += f"- **{k}:** {v}\n"
+                        report_md += f"\n## Token Usage\n{json.dumps(tu.to_dict(), indent=2)}\n\n## Generated Code\n```python\n{result.code}\n```"
+                        st.download_button("⬇️ Download Report", report_md,
+                                           file_name="analysis_report.md", mime="text/markdown", width="stretch")
+                    elif rpt_fmt == "JSON (.json)":
+                        report_json = {
+                            "query": result.query, "use_case": result.use_case,
+                            "timestamp": result.timestamp, "success": result.success,
+                            "insights": result.insights, "code": result.code,
+                            "token_usage": tu.to_dict(),
+                            "iterations": result.iterations,
+                        }
+                        st.download_button("⬇️ Download Report", json.dumps(report_json, indent=2, default=str),
+                                           file_name="analysis_report.json", mime="application/json", width="stretch")
+                    elif rpt_fmt == "CSV (.csv)":
+                        import csv, io as _io
+                        buf = _io.StringIO()
+                        writer = csv.writer(buf)
+                        writer.writerow(["Field", "Value"])
+                        writer.writerow(["Query", result.query])
+                        writer.writerow(["Use Case", result.use_case])
+                        writer.writerow(["Timestamp", result.timestamp])
+                        writer.writerow(["Success", result.success])
+                        writer.writerow(["Total Tokens", tu.total_tokens])
+                        writer.writerow(["Cost (USD)", f"${tu.estimated_cost_usd:.4f}"])
+                        for k, v in result.insights.items():
+                            writer.writerow([f"Insight: {k}", str(v)])
+                        st.download_button("⬇️ Download Report", buf.getvalue(),
+                                           file_name="analysis_report.csv", mime="text/csv", width="stretch")
+
+                # Chart downloads
+                if result.chart_paths:
+                    st.markdown("**📊 Chart Download**")
                     for cp in result.chart_paths:
+                        fname = Path(cp).name
                         if cp.endswith(".png"):
                             with open(cp, "rb") as f:
-                                st.download_button("⬇️ Chart", f.read(), file_name=Path(cp).name,
-                                                   mime="image/png", use_container_width=True)
-                            break
+                                st.download_button(f"⬇️ {fname}", f.read(),
+                                                   file_name=fname, mime="image/png", width="stretch")
+                        elif cp.endswith(".html"):
+                            with open(cp, "r", encoding="utf-8") as f:
+                                st.download_button(f"⬇️ {fname}", f.read(),
+                                                   file_name=fname, mime="text/html", width="stretch")
 
                 # Code + Execution Log
                 with st.expander("🔧 Generated Code"):
@@ -422,22 +716,176 @@ if st.session_state.df is not None:
             hist_df = pd.DataFrame(hist)
             hist_df = hist_df[["timestamp", "query", "use_case", "success", "attempts", "tokens", "cost", "wall_time"]]
             hist_df.columns = ["Time", "Query", "Use Case", "Success", "Attempts", "Tokens", "Cost ($)", "Time (s)"]
-            st.dataframe(hist_df, use_container_width=True, hide_index=True)
+            st.dataframe(hist_df, width="stretch", hide_index=True)
 
             st.download_button("⬇️ Export History", hist_df.to_csv(index=False),
-                               file_name="query_history.csv", mime="text/csv", use_container_width=True)
+                               file_name="query_history.csv", mime="text/csv", width="stretch")
         else:
             st.info("No queries yet. Run an analysis from the **🤖 AI Analysis** tab.")
 
 else:
-    # Welcome screen
-    st.markdown("""<div class="welcome-box">
-        <h2>Your AI-Powered Data Analyst</h2>
-        <p>Upload a CSV, Excel, or JSON file to get started.<br/>Ask questions in plain English — get professional charts and insights instantly.</p>
-        <div class="feature-grid">
-            <div class="feature-item"><div class="icon">🔄</div><div class="title">Self-Correcting AI</div><div class="desc">Writes, executes, and fixes code using RAG over Python/Pandas docs.</div></div>
-            <div class="feature-item"><div class="icon">📊</div><div class="title">Professional Charts</div><div class="desc">Interactive Plotly and Matplotlib charts from plain English.</div></div>
-            <div class="feature-item"><div class="icon">🔮</div><div class="title">Predictive Forecasting</div><div class="desc">Regression + ARIMA forecasting with confidence intervals.</div></div>
-            <div class="feature-item"><div class="icon">🧠</div><div class="title">RAG Pipeline</div><div class="desc">Self-correction via FAISS vector search over official docs.</div></div>
+    # ── Welcome Page — Immersive Fluid Analyst Design ──
+
+    # Hero Section
+    st.markdown("""<div class="hero-section">
+        <div class="hero-title">
+            Your <span class="gradient-text">AI-Powered</span> Data Analyst
         </div>
+        <div class="hero-subtitle">
+            Upload a CSV, Excel, or JSON file — ask questions in plain English,
+            get professional charts, insights, and predictive forecasts instantly.
+        </div>
+        <div class="hero-powered">Powered by Gemini • Ollama • GPT4All • RAG</div>
+    </div>""", unsafe_allow_html=True)
+
+    # 3D Organic AI Core Animation
+    components.html("""
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r125/three.min.js"></script>
+    <div id="threejs-container" style="width:100%;height:350px; display:flex; justify-content:center; align-items:center;"></div>
+    <script>
+    (function() {
+        const container = document.getElementById('threejs-container');
+        const width = container.clientWidth;
+        const height = container.clientHeight;
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+        renderer.setSize(width, height);
+        container.appendChild(renderer.domElement);
+        
+        const geometry = new THREE.IcosahedronGeometry(2, 4);
+        const material = new THREE.MeshPhongMaterial({
+            color: 0xff2d55, wireframe: true, transparent: true, opacity: 0.4,
+            emissive: 0x8e2de2, emissiveIntensity: 0.5
+        });
+        const core = new THREE.Mesh(geometry, material);
+        scene.add(core);
+        
+        const innerGeo = new THREE.SphereGeometry(1.2, 32, 32);
+        const innerMat = new THREE.MeshBasicMaterial({ color: 0xff2d55, transparent: true, opacity: 0.8 });
+        const innerCore = new THREE.Mesh(innerGeo, innerMat);
+        scene.add(innerCore);
+        
+        const light = new THREE.PointLight(0xffffff, 1, 100);
+        light.position.set(5, 5, 5);
+        scene.add(light);
+        
+        camera.position.z = 5;
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            core.rotation.x += 0.005;
+            core.rotation.y += 0.005;
+            const scale = 1 + Math.sin(Date.now() * 0.001) * 0.05;
+            innerCore.scale.set(scale, scale, scale);
+            innerCore.material.opacity = 0.4 + Math.sin(Date.now() * 0.002) * 0.2;
+            renderer.render(scene, camera);
+        }
+        
+        window.addEventListener('resize', () => {
+            const w = container.clientWidth;
+            const h = container.clientHeight;
+            renderer.setSize(w, h);
+            camera.aspect = w / h;
+            camera.updateProjectionMatrix();
+        });
+        
+        animate();
+    })();
+    </script>
+    """, height=350)
+
+    # Centered Upload Card
+    st.markdown("""<div class="upload-card">
+        <div class="upload-icon">☁️</div>
+        <div class="upload-title">Upload Dataset</div>
+        <div class="upload-desc">CSV, Excel, JSON — or use a sample dataset from the sidebar</div>
+    </div>""", unsafe_allow_html=True)
+
+    # File uploader in main area for easy access
+    col_pad1, col_up, col_pad2 = st.columns([1, 2, 1])
+    with col_up:
+        main_upload = st.file_uploader("Drop your file here", type=["csv", "xlsx", "xls", "json"],
+                                        help="CSV, Excel, JSON up to 200MB", key="main_uploader",
+                                        label_visibility="collapsed")
+        if main_upload is not None and main_upload.name != st.session_state.file_name:
+            from utils.data_loader import load_file
+            df_up, msg_up = load_file(main_upload)
+            if df_up is not None:
+                st.session_state.df = df_up
+                st.session_state.file_name = main_upload.name
+                st.session_state.schema_report = None
+                st.session_state.analysis_result = None
+                st.rerun()
+            else:
+                st.error(msg_up)
+
+    # Core Capabilities Grid
+    st.markdown("""<div class="cap-grid">
+        <div class="cap-card">
+            <div class="cap-icon">🔄</div>
+            <div class="cap-title">Self-Correcting AI Agent</div>
+            <div class="cap-desc">Autonomous code generation with error detection and RAG-powered self-correction. Retries up to 3 times using documentation context.</div>
+        </div>
+        <div class="cap-card">
+            <div class="cap-icon">📊</div>
+            <div class="cap-title">Professional Charts</div>
+            <div class="cap-desc">Interactive Plotly and Matplotlib visualizations generated from plain English queries. Publication-ready with dark theme styling.</div>
+        </div>
+        <div class="cap-card">
+            <div class="cap-icon">🔮</div>
+            <div class="cap-title">Predictive Forecasting</div>
+            <div class="cap-desc">Linear regression and ARIMA time-series forecasting with confidence intervals. Automatic trend detection and growth analysis.</div>
+        </div>
+        <div class="cap-card">
+            <div class="cap-icon">🧠</div>
+            <div class="cap-title">RAG Pipeline</div>
+            <div class="cap-desc">FAISS or TF-IDF vector search over Python/Pandas documentation for intelligent error recovery and code self-correction.</div>
+        </div>
+    </div>""", unsafe_allow_html=True)
+
+    # Backend Status Cards
+    st.markdown("")
+    st.markdown("")
+    from core.llm_backend import check_gpt4all_available
+    _gpt4all_ok_w = check_gpt4all_available()
+    _gemini_status = "✅ Ready" if _has_valid_key else "❌ No key"
+    _ollama_status = "✅ Running" if _ollama_ok else "❌ Offline"
+    _gpt4all_status = "✅ Installed" if _gpt4all_ok_w else "❌ Missing"
+    _gemini_cls = "be-ok" if _has_valid_key else "be-err"
+    _ollama_cls = "be-ok" if _ollama_ok else "be-err"
+    _gpt4all_cls = "be-ok" if _gpt4all_ok_w else "be-err"
+
+    st.markdown(f"""<div class="backend-grid">
+        <div class="backend-card">
+            <div class="be-tier">TIER 1</div>
+            <div class="be-name">✨ Gemini</div>
+            <div class="be-status {_gemini_cls}">{_gemini_status}</div>
+        </div>
+        <div class="backend-card">
+            <div class="be-tier">TIER 2</div>
+            <div class="be-name">🦙 Ollama</div>
+            <div class="be-status {_ollama_cls}">{_ollama_status}</div>
+        </div>
+        <div class="backend-card">
+            <div class="be-tier">TIER 3</div>
+            <div class="be-name">🧠 GPT4All</div>
+            <div class="be-status {_gpt4all_cls}">{_gpt4all_status}</div>
+        </div>
+        <div class="backend-card">
+            <div class="be-tier">TIER 4</div>
+            <div class="be-name">🎯 Demo</div>
+            <div class="be-status be-ok">✅ Always On</div>
+        </div>
+    </div>""", unsafe_allow_html=True)
+
+    if active_backend == "demo":
+        st.info("🎯 **Demo Mode active** — Upload data and click Run Analysis. Works without any API keys!")
+    elif active_backend == "gpt4all":
+        st.success("🧠 **GPT4All (Phi-4-mini)** running locally on CPU — no API keys needed!")
+
+    # Footer
+    st.markdown("""<div class="app-footer">
+        <div class="footer-brand">Fluid Analyst</div>
+        <div class="footer-sub">Built by Umang Vijay • JECRC University • Celebal CEI Internship</div>
     </div>""", unsafe_allow_html=True)

@@ -1,27 +1,29 @@
 """
 Schema Analyzer — Auto-generates a comprehensive dataset summary upon upload.
 
-Uses Pandas profiling + Gemini to produce a natural language summary
+Uses Pandas profiling + LLM to produce a natural language summary
 of the dataset's structure, quality, and suggested analysis approaches.
+
+Supports any LangChain-compatible LLM (Gemini, Ollama, etc.).
 """
 
 import pandas as pd
 from typing import Optional
-from langchain_google_genai import ChatGoogleGenerativeAI
 
 
 class SchemaAnalyzer:
-    """Generates automatic dataset schema summaries using Pandas + Gemini."""
+    """Generates automatic dataset schema summaries using Pandas + LLM."""
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: Optional[str] = None, llm=None):
         self.api_key = api_key
-        self.llm = None
-        if api_key:
-            self.llm = ChatGoogleGenerativeAI(
-                model="gemini-2.0-flash",
-                google_api_key=api_key,
-                temperature=0.3,
-            )
+        self.llm = llm
+        # If no LLM provided but API key given, try to create one
+        if self.llm is None and api_key:
+            try:
+                from core.llm_backend import get_llm
+                self.llm, _ = get_llm(backend="auto", api_key=api_key, temperature=0.3)
+            except Exception:
+                self.llm = None  # Will use pandas-only fallback
 
     def analyze(self, df: pd.DataFrame) -> dict:
         """
@@ -79,7 +81,7 @@ class SchemaAnalyzer:
         for col in cat_cols:
             if col not in datetime_cols:
                 try:
-                    pd.to_datetime(df[col].dropna().head(20), errors="raise")
+                    pd.to_datetime(df[col].dropna().head(20), format="mixed", errors="raise")
                     datetime_cols.append(col)
                 except (ValueError, TypeError):
                     pass
@@ -143,7 +145,7 @@ class SchemaAnalyzer:
         return suggestions
 
     def _generate_ai_summary(self, report: dict, df: pd.DataFrame) -> str:
-        """Generate a natural language summary using Gemini."""
+        """Generate a natural language summary using Gemini, with clean fallback."""
         try:
             sample = df.head(5).to_string()
             prompt = f"""Analyze this dataset and provide a concise 3-4 sentence summary.
@@ -166,4 +168,37 @@ its quality, and what analyses would be most valuable. Keep it under 100 words."
             response = self.llm.invoke(prompt)
             return response.content.strip()
         except Exception as e:
-            return f"Auto-summary unavailable: {str(e)}"
+            # Generate a clean pandas-only fallback summary instead of raw error
+            return self._generate_fallback_summary(report)
+
+    def _generate_fallback_summary(self, report: dict) -> str:
+        """Generate a basic summary using only Pandas stats (no LLM needed)."""
+        rows = report.get("rows", 0)
+        cols = report.get("columns", 0)
+        missing = report.get("missing_pct", 0)
+        quality = report.get("quality_score", 0)
+        numeric_count = len(report.get("numeric_cols", []))
+        cat_count = len(report.get("categorical_cols", []))
+        dt_count = len(report.get("datetime_cols", []))
+
+        parts = [
+            f"Dataset contains {rows:,} rows across {cols} columns",
+            f"({numeric_count} numeric, {cat_count} categorical"
+            + (f", {dt_count} datetime" if dt_count else "") + ").",
+        ]
+
+        if missing > 0:
+            parts.append(f"Missing data: {missing}%.")
+        else:
+            parts.append("No missing values detected.")
+
+        parts.append(f"Data quality score: {quality}%.")
+
+        # Add suggestion based on column types
+        if dt_count > 0 and numeric_count > 0:
+            parts.append("Time-series trend analysis and forecasting are recommended.")
+        elif numeric_count >= 2:
+            parts.append("Correlation analysis and visualizations are recommended.")
+
+        return " ".join(parts)
+

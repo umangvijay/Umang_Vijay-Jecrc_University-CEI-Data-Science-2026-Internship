@@ -1,5 +1,9 @@
 """
-RAG Pipeline — FAISS-backed Retrieval-Augmented Generation for self-correction.
+RAG Pipeline — Retrieval-Augmented Generation for self-correction.
+
+Supports two modes:
+  1. FAISS + LangChain embeddings (Gemini, Ollama) — best quality
+  2. TF-IDF local fallback (scikit-learn) — works offline, no API needed
 """
 
 import os
@@ -9,48 +13,126 @@ from typing import List, Optional, Tuple
 
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
-from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_core.documents import Document
 
 
-class RAGPipeline:
-    """RAG self-correction engine using FAISS vector store over Pandas/Python docs."""
+# ─────────────────────────────────────────────────────────
+# Local TF-IDF Fallback (no API / no embeddings needed)
+# ─────────────────────────────────────────────────────────
 
-    def __init__(self, api_key: str, docs_dir: Optional[str] = None,
-                 index_dir: Optional[str] = None):
+class TFIDFLocalRetriever:
+    """
+    A lightweight local retriever using scikit-learn TF-IDF.
+    Used as a fallback when no embedding API is available.
+    """
+
+    def __init__(self):
+        self._chunks: List[Document] = []
+        self._tfidf_matrix = None
+        self._vectorizer = None
+
+    def build(self, chunks: List[Document]) -> bool:
+        """Build TF-IDF index from document chunks."""
+        if not chunks:
+            return False
+        try:
+            from sklearn.feature_extraction.text import TfidfVectorizer
+            self._chunks = chunks
+            texts = [c.page_content for c in chunks]
+            self._vectorizer = TfidfVectorizer(
+                stop_words="english", max_features=5000, ngram_range=(1, 2)
+            )
+            self._tfidf_matrix = self._vectorizer.fit_transform(texts)
+            return True
+        except Exception:
+            return False
+
+    def search(self, query: str, top_k: int = 5) -> List[Tuple[Document, float]]:
+        """Search for the most similar documents using cosine similarity."""
+        if self._tfidf_matrix is None or self._vectorizer is None:
+            return []
+        try:
+            from sklearn.metrics.pairwise import cosine_similarity
+            query_vec = self._vectorizer.transform([query])
+            scores = cosine_similarity(query_vec, self._tfidf_matrix).flatten()
+            top_indices = scores.argsort()[::-1][:top_k]
+            return [(self._chunks[i], float(scores[i])) for i in top_indices if scores[i] > 0]
+        except Exception:
+            return []
+
+    @property
+    def ntotal(self) -> int:
+        return len(self._chunks) if self._chunks else 0
+
+
+class RAGPipeline:
+    """RAG self-correction engine using FAISS vector store over Pandas/Python docs.
+    Falls back to TF-IDF local retrieval when no embeddings API is available."""
+
+    def __init__(self, api_key: str = "", docs_dir: Optional[str] = None,
+                 index_dir: Optional[str] = None, embeddings=None):
         self.api_key = api_key
         self.project_root = Path(__file__).parent.parent
         self.docs_dir = Path(docs_dir) if docs_dir else self.project_root / "docs_corpus"
         self.index_dir = Path(index_dir) if index_dir else self.project_root / "faiss_index"
 
-        self.embeddings = GoogleGenerativeAIEmbeddings(
-            model="models/embedding-001",
-            google_api_key=api_key,
-        )
+        # Use provided embeddings or try to create from API key
+        self.embeddings = embeddings
+        if self.embeddings is None and api_key:
+            try:
+                from langchain_google_genai import GoogleGenerativeAIEmbeddings
+                self.embeddings = GoogleGenerativeAIEmbeddings(
+                    model="models/embedding-001",
+                    google_api_key=api_key,
+                )
+            except Exception:
+                pass  # Will fall back to TF-IDF
+
         self.vector_store: Optional[FAISS] = None
+        self._tfidf_retriever: Optional[TFIDFLocalRetriever] = None
+        self._backend = "none"  # "faiss" or "tfidf"
         self.text_splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000, chunk_overlap=200, length_function=len,
             separators=["\n\n", "\n", ". ", " ", ""],
         )
 
     def build_or_load_index(self) -> bool:
-        """Build FAISS index from docs or load from disk. Returns True if ready."""
-        if self.index_dir.exists() and (self.index_dir / "index.faiss").exists():
-            try:
-                self.vector_store = FAISS.load_local(
-                    str(self.index_dir), self.embeddings,
-                    allow_dangerous_deserialization=True,
-                )
+        """Build FAISS index from docs or load from disk.
+        Falls back to TF-IDF if no embeddings are available.
+        Returns True if any retrieval backend is ready."""
+        # Try FAISS first (requires embeddings)
+        if self.embeddings is not None:
+            if self.index_dir.exists() and (self.index_dir / "index.faiss").exists():
+                try:
+                    self.vector_store = FAISS.load_local(
+                        str(self.index_dir), self.embeddings,
+                        allow_dangerous_deserialization=True,
+                    )
+                    self._backend = "faiss"
+                    return True
+                except Exception:
+                    pass
+            if self.build_index():
                 return True
-            except Exception:
-                pass
-        return self.build_index()
 
-    def build_index(self) -> bool:
-        """Build FAISS index from all .txt files in docs_dir."""
-        if not self.docs_dir.exists():
+        # Fallback: TF-IDF local retriever (works without any API)
+        return self._build_tfidf_index()
+
+    def _build_tfidf_index(self) -> bool:
+        """Build a TF-IDF local retrieval index as fallback."""
+        chunks = self._load_and_split_docs()
+        if not chunks:
             return False
+        self._tfidf_retriever = TFIDFLocalRetriever()
+        if self._tfidf_retriever.build(chunks):
+            self._backend = "tfidf"
+            return True
+        return False
 
+    def _load_and_split_docs(self) -> List[Document]:
+        """Load all .txt docs and split into chunks."""
+        if not self.docs_dir.exists():
+            return []
         documents = []
         for txt_file in sorted(self.docs_dir.glob("*.txt")):
             try:
@@ -63,29 +145,38 @@ class RAGPipeline:
                     ))
             except Exception:
                 continue
-
         if not documents:
-            return False
+            return []
+        return self.text_splitter.split_documents(documents)
 
-        chunks = self.text_splitter.split_documents(documents)
+    def build_index(self) -> bool:
+        """Build FAISS index from all .txt files in docs_dir."""
+        chunks = self._load_and_split_docs()
+        if not chunks:
+            return False
         try:
             self.vector_store = FAISS.from_documents(chunks, self.embeddings)
             self.index_dir.mkdir(parents=True, exist_ok=True)
             self.vector_store.save_local(str(self.index_dir))
+            self._backend = "faiss"
             return True
         except Exception:
             return False
 
     def query_for_fix(self, error_message: str, original_code: str, top_k: int = 5) -> str:
         """Query docs to find relevant context for fixing a code error."""
-        if self.vector_store is None:
-            return "RAG index not available."
-
         query = self._build_error_query(error_message, original_code)
-        try:
-            results = self.vector_store.similarity_search_with_score(query, k=top_k)
-        except Exception as e:
-            return f"RAG query failed: {e}"
+
+        # Use FAISS if available, else TF-IDF
+        if self.vector_store is not None:
+            try:
+                results = self.vector_store.similarity_search_with_score(query, k=top_k)
+            except Exception as e:
+                return f"RAG query failed: {e}"
+        elif self._tfidf_retriever is not None:
+            results = self._tfidf_retriever.search(query, top_k=top_k)
+        else:
+            return "RAG index not available."
 
         if not results:
             return "No relevant documentation found."
@@ -101,13 +192,16 @@ class RAGPipeline:
 
     def query(self, question: str, top_k: int = 5) -> List[Tuple[str, float]]:
         """General-purpose query. Returns list of (content, score)."""
-        if self.vector_store is None:
-            return []
-        try:
-            results = self.vector_store.similarity_search_with_score(question, k=top_k)
+        if self.vector_store is not None:
+            try:
+                results = self.vector_store.similarity_search_with_score(question, k=top_k)
+                return [(doc.page_content, score) for doc, score in results]
+            except Exception:
+                pass
+        if self._tfidf_retriever is not None:
+            results = self._tfidf_retriever.search(question, top_k=top_k)
             return [(doc.page_content, score) for doc, score in results]
-        except Exception:
-            return []
+        return []
 
     def _build_error_query(self, error_message: str, code: str) -> str:
         """Build optimized search query from error and code context."""
@@ -133,10 +227,14 @@ class RAGPipeline:
 
     def get_index_stats(self) -> dict:
         """Get statistics about the current FAISS index."""
-        if self.vector_store is None:
-            return {"status": "not_loaded", "num_vectors": 0}
-        try:
-            return {"status": "loaded", "num_vectors": self.vector_store.index.ntotal,
-                    "index_dir": str(self.index_dir)}
-        except Exception:
-            return {"status": "error", "num_vectors": 0}
+        if self._backend == "faiss" and self.vector_store is not None:
+            try:
+                return {"status": "loaded", "backend": "faiss",
+                        "num_vectors": self.vector_store.index.ntotal,
+                        "index_dir": str(self.index_dir)}
+            except Exception:
+                return {"status": "error", "backend": "faiss", "num_vectors": 0}
+        elif self._backend == "tfidf" and self._tfidf_retriever is not None:
+            return {"status": "loaded", "backend": "tfidf",
+                    "num_chunks": self._tfidf_retriever.ntotal}
+        return {"status": "not_loaded", "num_vectors": 0}

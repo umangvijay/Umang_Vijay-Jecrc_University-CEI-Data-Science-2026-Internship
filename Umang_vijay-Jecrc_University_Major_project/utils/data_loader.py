@@ -145,7 +145,7 @@ def get_dataframe_info(df: pd.DataFrame) -> dict:
     # Try to detect datetime columns stored as strings
     for col in categorical_cols:
         try:
-            pd.to_datetime(df[col], infer_datetime_format=True, errors="raise")
+            pd.to_datetime(df[col], format="mixed", errors="raise")
             datetime_cols.append(col)
         except (ValueError, TypeError):
             pass

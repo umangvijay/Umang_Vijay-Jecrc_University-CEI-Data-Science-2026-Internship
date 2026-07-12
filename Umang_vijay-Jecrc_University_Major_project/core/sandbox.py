@@ -83,6 +83,7 @@ class SandboxExecutor:
         self.project_root = Path(__file__).parent.parent
         self.sandbox_dir = self.project_root / "sandbox_temp"
         self.sandbox_dir.mkdir(exist_ok=True)
+        self._python_exe = self._resolve_python()
 
     def execute(self, code: str, df_path: str, timeout: Optional[int] = None) -> ExecutionResult:
         """
@@ -129,9 +130,9 @@ class SandboxExecutor:
             import time
             start_time = time.time()
 
-            # Run in subprocess
+            # Run in subprocess using resolved venv Python
             result = subprocess.run(
-                [sys.executable, str(script_path)],
+                [self._python_exe, str(script_path)],
                 capture_output=True,
                 text=True,
                 timeout=timeout,
@@ -283,6 +284,33 @@ def report_insights(insights_dict):
                      "AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"]:
             safe_env.pop(key, None)
         return safe_env
+
+    def _resolve_python(self) -> str:
+        """
+        Resolve the correct Python interpreter.
+
+        Priority:
+        1. sys.executable (correct when app is run from activated venv)
+        2. Venv Python relative to project root (fallback)
+        3. System Python (last resort)
+        """
+        # If we're already running inside a venv, sys.executable is correct
+        current = sys.executable
+        if "venv" in current.lower() or "env" in current.lower():
+            return current
+
+        # Try to find venv Python relative to project root
+        venv_python = self.project_root / "venv" / "Scripts" / "python.exe"
+        if venv_python.exists():
+            return str(venv_python)
+
+        # Linux/macOS venv path
+        venv_python_unix = self.project_root / "venv" / "bin" / "python"
+        if venv_python_unix.exists():
+            return str(venv_python_unix)
+
+        # Fallback to current interpreter
+        return current
 
     def _collect_charts(self, chart_dir: Path) -> List[str]:
         """

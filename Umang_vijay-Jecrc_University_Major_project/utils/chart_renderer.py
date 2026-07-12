@@ -81,13 +81,13 @@ def apply_plotly_theme(fig: go.Figure) -> go.Figure:
     return fig
 
 
-def render_plotly_chart(fig: go.Figure, container=None, use_container_width: bool = True):
+def render_plotly_chart(fig: go.Figure, container=None, width: str = "stretch"):
     """
     Render a Plotly figure in Streamlit with premium styling.
     """
     fig = apply_plotly_theme(fig)
     target = container or st
-    target.plotly_chart(fig, use_container_width=use_container_width)
+    target.plotly_chart(fig, width=width)
 
 
 def render_matplotlib_chart(fig: plt.Figure, container=None):

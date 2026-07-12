@@ -16,7 +16,7 @@ from dataclasses import dataclass, field
 from typing import Optional, List, Dict
 from pathlib import Path
 
-from langchain_google_genai import ChatGoogleGenerativeAI
+from core.llm_backend import get_llm, get_embeddings
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from core.sandbox import SandboxExecutor, ExecutionResult
@@ -99,20 +99,26 @@ RULES:
 9. NEVER use os.system, subprocess, eval, exec, or open().
 10. If a column doesn't exist, pick the closest match from available columns."""
 
-    def __init__(self, api_key: str, max_retries: int = 3, temperature: float = 0.2):
+    def __init__(self, api_key: str = "", max_retries: int = 3,
+                 temperature: float = 0.2, backend: str = "auto"):
         self.api_key = api_key
         self.max_retries = max_retries
+        self.backend_name = "unknown"
 
-        self.llm = ChatGoogleGenerativeAI(
-            model="gemini-2.0-flash",
-            google_api_key=api_key,
-            temperature=temperature,
-            max_output_tokens=4096,
+        # Create LLM via multi-backend factory
+        self.llm, self.backend_name = get_llm(
+            backend=backend, api_key=api_key,
+            temperature=temperature, max_output_tokens=4096,
         )
 
         self.sandbox = SandboxExecutor(timeout=30)
-        self.rag = RAGPipeline(api_key)
-        self.schema_analyzer = SchemaAnalyzer(api_key)
+
+        # RAG pipeline with backend-aware embeddings
+        embeddings, emb_backend = get_embeddings(backend=backend, api_key=api_key)
+        self.rag = RAGPipeline(api_key=api_key, embeddings=embeddings)
+        self.schema_analyzer = SchemaAnalyzer(
+            api_key=api_key, llm=self.llm
+        )
 
         # Build/load RAG index
         self._rag_ready = False
@@ -363,6 +369,12 @@ Write the COMPLETE corrected code. CODE ONLY, no explanations."""
     def _extract_code(self, response_text: str) -> str:
         """Extract Python code from LLM response, stripping markdown fences."""
         text = response_text.strip()
+
+        # Detect error comments from failed LLM calls
+        error_prefixes = ["# Code generation error:", "# Code regeneration error:"]
+        for prefix in error_prefixes:
+            if text.startswith(prefix):
+                return ""  # Return empty so agent treats this as failure
 
         # Remove markdown code fences
         patterns = [
